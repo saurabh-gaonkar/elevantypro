@@ -1,6 +1,5 @@
 ---
 title: Eleventy Site
-layout: base.njk
+layout: layout/page.njk
 name: "saurabh"
 ---
-
