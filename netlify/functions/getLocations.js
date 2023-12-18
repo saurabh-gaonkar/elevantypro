@@ -1,59 +1,55 @@
-// getLocation.js
+const axios = require('axios');
 
-module.exports = async function (event, context) {
+exports.handler = async function (event, context) {
   try {
-    // Assuming you have set up environment variables in Netlify for your API keys
-    const GEOLOCATION_KEY = "AIzaSyBdnk37CjZp57OslQ_UZH9m5gjfYm7QWPA";
-    const GEOCODING_KEY = "AIzaSyDbjIZwTH0ZaRFIyHQuJG7OwAsGU0_HvJo";
+    // Google API keys
+    const geolocationApiKey = 'AIzaSyBdnk37CjZp57OslQ_UZH9m5gjfYm7QWPA';
+    const geocodeApiKey = 'AIzaSyDbjIZwTH0ZaRFIyHQuJG7OwAsGU0_HvJo';
 
-    // Step 1: Get Coordinates
-    const getCoordinatesUrl = `https://www.googleapis.com/geolocation/v1/geolocate?key=${GEOLOCATION_KEY}`;
-    const coordinatesRes = await fetch(getCoordinatesUrl, { method: "POST" });
+    // Step 1: Get the user's IP address (Netlify-specific headers)
+    const userIpAddress =
+      event.headers['client-ip'] ||
+      event.headers['x-real-ip'] ||
+      event.headers['x-forwarded-for'] ||
+      event.ip;
 
-    if (coordinatesRes.status === 200) {
-      const coordinatesVal = await coordinatesRes.json();
+    // Step 2: Use Google Geolocation API to get coordinates
+    const geolocationUrl = `https://www.googleapis.com/geolocation/v1/geolocate?key=${geolocationApiKey}`;
+    const geolocationResponse = await axios.post(geolocationUrl, {
+      considerIp: true,
+      wifiAccessPoints: [],
+    });
+    const { location } = geolocationResponse.data;
 
-      if (coordinatesVal.location) {
-        const { lat, lng } = coordinatesVal.location;
-        let latlng = `${lat},${lng}`;
+    // Step 3: Use Google Geocoding API to get detailed location information
+    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${location.lat},${location.lng}&key=${geocodeApiKey}`;
+    const geocodeResponse = await axios.get(geocodeUrl);
+    const detailedLocation = geocodeResponse.data.results[0];
 
-        // Step 2: Get Country
-        const getCountryUrl = `https://maps.googleapis.com/maps/api/geocode/json?key=${GEOCODING_KEY}&latlng=${latlng}`;
-        const countryRes = await fetch(getCountryUrl);
-        const countryVal = await countryRes.json();
+    // Step 4: Determine the redirect URL based on the user's location
+    let redirectUrl = '/'; // Default redirect URL
 
-        if (countryVal.status === 'OK') {
-          const addressComponents = countryVal.results[0].address_components;
-          let city, zipcode, country, state, county;
+    // Example: Redirect users in the United States to a specific page
+    if (detailedLocation && detailedLocation.address_components) {
+      const countryComponent = detailedLocation.address_components.find(
+        (component) => component.types.includes('country')
+      );
 
-          addressComponents.forEach((item) => {
-            if (item.types[0] === 'postal_code') {
-              zipcode = item.long_name ? item.long_name : item.short_name;
-            } else if (item.types[0] === 'country') {
-              country = item.short_name ? item.short_name : item.long_name;
-            } else if (item.types[0] === 'locality') {
-              city = item.short_name ? item.short_name : item.long_name;
-            } else if (item.types[0] === 'administrative_area_level_1') {
-              state = item.short_name ? item.short_name : item.long_name;
-            } else if (item.types[0] === 'administrative_area_level_2') {
-              county = item.short_name ? item.short_name : item.long_name;
-            }
-          });
-
-          return {
-            statusCode: 200,
-            body: JSON.stringify({ city, zipcode, country, state, county }),
-          };
-        }
+      if (countryComponent && countryComponent.short_name === 'US') {
+        redirectUrl = '/us-specific-page';
       }
     }
 
+    // Step 5: Return the redirect URL in the response
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Unable to fetch location information' }),
+      statusCode: 302, // 302 Found (Temporary Redirect)
+      headers: {
+        Location: redirectUrl,
+      },
+      body: '',
     };
   } catch (error) {
-    console.error('Error fetching location:', error);
+    console.error('Error:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Internal Server Error' }),
