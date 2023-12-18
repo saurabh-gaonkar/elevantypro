@@ -6,6 +6,6 @@ title: Page Title
 
 <h1>Location Information</h1>
   <div>
-    {% set locationData = fetch('/.netlify/functions/getLocation').json() %}
-    <pre>{{ locationData | safe }}</pre>
+    {% set locationData = getLocationData() | safe %}
+    <pre>{{ locationData }}</pre>
   </div>
