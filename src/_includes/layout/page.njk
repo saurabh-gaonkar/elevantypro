@@ -3,3 +3,9 @@ layout: layout/base.njk
 title: Page Title
 ---
 <h3>{{ title }}</h3>
+
+<h1>Location Information</h1>
+  <div>
+    {% set locationData = fetch('/.netlify/functions/getLocation').json() %}
+    <pre>{{ locationData | safe }}</pre>
+  </div>
