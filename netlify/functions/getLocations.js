@@ -1,58 +1,30 @@
-const axios = require('axios');
+export default async (request, context) => {
+  const countryName = context.geo?.country?.name || "somewhere in the world";
+  const latlng = `${context.geo?.latitude},${context.geo?.longitude}`;
+  const getCountryUrl = `https://maps.googleapis.com/maps/api/geocode/json?key=AIzaSyDbjIZwTH0ZaRFIyHQuJG7OwAsGU0_HvJo&latlng=${latlng}`;
+  const countryRes = await fetch(getCountryUrl);
+  const countryVal = await countryRes.json();
 
-exports.handler = async function (event, context) {
-  try {
-    // Google API keys
-    const geolocationApiKey = 'AIzaSyBdnk37CjZp57OslQ_UZH9m5gjfYm7QWPA';
-    const geocodeApiKey = 'AIzaSyDbjIZwTH0ZaRFIyHQuJG7OwAsGU0_HvJo';
+  const addressComponents = countryVal.results[0].address_components;
+  console.log(addressComponents, "test");
 
-    // Step 1: Get the user's IP address (Netlify-specific headers)
-    const userIpAddress =
-      event.headers['client-ip'] ||
-      event.headers['x-real-ip'] ||
-      event.headers['x-forwarded-for'] ||
-      event.ip;
+  if (countryName === "IN") {
+    const url = new URL("/en-us/home", request.url);
 
-    // Step 2: Use Google Geolocation API to get coordinates
-    const geolocationUrl = `https://www.googleapis.com/geolocation/v1/geolocate?key=${geolocationApiKey}`;
-    const geolocationResponse = await axios.post(geolocationUrl, {
-      considerIp: true,
-      wifiAccessPoints: [],
-    });
-    const { location } = geolocationResponse.data;
-
-    // Step 3: Use Google Geocoding API to get detailed location information
-    const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${location.lat},${location.lng}&key=${geocodeApiKey}`;
-    const geocodeResponse = await axios.get(geocodeUrl);
-    const detailedLocation = geocodeResponse.data.results[0];
-
-    // Step 4: Determine the redirect URL based on the user's location
-    let redirectUrl = '/'; // Default redirect URL
-
-    // Example: Redirect users in the United States to a specific page
-    if (detailedLocation && detailedLocation.address_components) {
-      const countryComponent = detailedLocation.address_components.find(
-        (component) => component.types.includes('country')
-      );
-
-      if (countryComponent && countryComponent.short_name === 'US') {
-        redirectUrl = '/us-specific-page';
-      }
-    }
-
-    // Step 5: Return the redirect URL in the response
-    return {
-      statusCode: 302, // 302 Found (Temporary Redirect)
-      headers: {
-        Location: redirectUrl,
-      },
-      body: '',
-    };
-  } catch (error) {
-    console.error('Error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal Server Error' }),
-    };
+    return Response.redirect(url);
   }
+
+  // For other countries, serve the default HTML page
+  const defaultPagePath = "/en-us/index.html"; // Adjust this to your default page path
+  const defaultPageUrl = new URL(defaultPagePath, request.url);
+
+  // Fetch the default page content
+  const response = await fetch(defaultPageUrl);
+
+  // Return the fetched response
+  return response;
+};
+
+export const config = {
+  path: "/en-us",
 };
